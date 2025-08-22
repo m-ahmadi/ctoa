@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkctrader_openapi_docs=self.webpackChunkctrader_openapi_docs||[]).push([[9647],{8122:(e,r,s)=>{s.r(r),s.d(r,{default:()=>u});s(6540);var a=s(4164),c=s(204),d=s(1769),n=s(2831),p=s(1410),t=s(4848);function u(e){return(0,t.jsx)(d.e3,{className:(0,a.A)(c.G.wrapper.docsPages),children:(0,t.jsx)(p.A,{children:(0,n.v)(e.route.routes)})})}}}]);
