@@ -1,0 +1,26 @@
+# API Endpoints
+
+There are 4 pieces of detail about API endpoints:
+
+1. Host of the endpoint
+2. Port of the endpoint
+3. Specific host designated base on account type
+4. Specific port designated base on messaging type
+
+Below table shows all the possible combinations:
+
+| Host                  | Port   | Account Type | Messaging Format |
+| --------------------- | ------ | ------------ | ---------------- |
+| `live.ctraderapi.com` | `5035` | Live         | Protobuf         |
+| `demo.ctraderapi.com` | `5035` | Demo         | Protobuf         |
+| `live.ctraderapi.com` | `5036` | Live         | JSON             |
+| `demo.ctraderapi.com` | `5036` | Demo         | JSON             |
+
+### An Example
+
+Let's say you have a live account and you want to use JSON as the method of  
+communication with the server. In that case, you should use below endpoint:
+
+```
+'live.ctraderapi.com:5036'
+```
