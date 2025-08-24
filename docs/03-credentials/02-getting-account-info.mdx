@@ -1,0 +1,40 @@
+# How to get your account info
+
+1. Go to this page https://openapi.ctrader.com/apps.
+2. Log-in with your cTrader account (if not already logged-in).
+3. Click **`Sandbox`** on one of the entries.
+   1. Under **"Scope"**, select **`Account info`**.
+   2. Click **`Get token`**.
+   3. Click **`Allow access`**.
+   4. Copy the **`Access token`** (this is called "sandbox access token").
+4. Open below URL with an `accessToken` query param set to the token acquired in
+   previous step:  
+   https://api.spotware.com/connect/tradingaccounts?access_token=  
+   (**Note**: You can also use your
+   ["real access token"](./acquiring-credentials) here too)
+
+Now you will have a list of all of your trading accounts associated with your
+cTrader accounts in `JSON` format.
+
+You will have below properties for each trading account:
+
+```json
+// prettier-ignore
+{
+  "accountId":                   0,
+  "accountNumber":               0,
+  "live":                        false,
+  "brokerName":                  "",
+  "brokerTitle":                 "",
+  "depositCurrency":             "",
+  "traderRegistrationTimestamp": 0,
+  "traderAccountType":           "",
+  "leverage":                    0,
+  "leverageInCents":             0,
+  "balance":                     0,
+  "deleted":                     false,
+  "accountStatus":               "",
+  "swapFree":                    false,
+  "moneyDigits":                 0
+}
+```
