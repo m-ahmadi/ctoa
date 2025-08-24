@@ -1,0 +1,26 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.sidebar.category.Contacting the API": {
+    "message": "Contacting the API",
+    "description": "The label for category Contacting the API in sidebar sidebar"
+  },
+  "sidebar.sidebar.category.Protobuf": {
+    "message": "Protobuf",
+    "description": "The label for category Protobuf in sidebar sidebar"
+  },
+  "sidebar.sidebar.category.Credentials": {
+    "message": "Credentials",
+    "description": "The label for category Credentials in sidebar sidebar"
+  },
+  "sidebar.sidebar.category.Placing Orders": {
+    "message": "Placing Orders",
+    "description": "The label for category Placing Orders in sidebar sidebar"
+  },
+  "sidebar.sidebar.category.Historical Data": {
+    "message": "Historical Data",
+    "description": "The label for category Historical Data in sidebar sidebar"
+  }
+}

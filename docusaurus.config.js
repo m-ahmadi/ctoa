@@ -1,0 +1,101 @@
+// @ts-check
+// `@type` JSDoc annotations allow editor autocompletion and type checking
+// (when paired with `@ts-check`).
+// There are various equivalent ways to declare your Docusaurus config.
+// See: https://docusaurus.io/docs/api/docusaurus-config
+
+import {themes as prismThemes} from 'prism-react-renderer';
+
+/** @type {import('@docusaurus/types').Config} */
+const config = {
+  title: 'cTrader OpenAPI Community Docs',
+  tagline: 'Things',
+  
+  url: 'https://m-ahmadi.github.io/',
+  baseUrl: '/ctoa/',
+  
+  organizationName: 'm-ahmadi',
+  projectName: 'ctoa',
+  
+  trailingSlash: false,
+
+  onBrokenLinks: 'throw',
+  onBrokenMarkdownLinks: 'warn',
+  
+  i18n: {
+    defaultLocale: 'en',
+    // locales: ['en'],
+    locales: ['en', 'fa'],
+    path: 'i18n',
+    localeConfigs: {
+      en: {
+        label: 'English',
+        direction: 'ltr',
+        htmlLang: 'en-US',
+        calendar: 'gregory',
+        path: 'en',
+      },
+      fa: {
+        label: 'فارسی',
+        direction: 'rtl',
+        htmlLang: 'fa-IR',
+        calendar: 'persian',
+        path: 'fa',
+      },
+    },
+  },
+
+  presets: [
+    [
+      'classic',
+      /** @type {import('@docusaurus/preset-classic').Options} */
+      ({
+        docs: {
+          routeBasePath: '/',
+          sidebarPath: './sidebars.js',
+          editUrl: 'https://github.com/m-ahmadi/ctoa/blob/main/'
+        },
+        blog: false,
+        sitemap: {
+          lastmod: 'date',
+          changefreq: 'weekly',
+          priority: 0.5,
+          ignorePatterns: ['/tags/**'],
+          filename: 'sitemap.xml',
+          createSitemapItems: async (params) => {
+            const {defaultCreateSitemapItems, ...rest} = params;
+            const items = await defaultCreateSitemapItems(rest);
+            return items.filter((item) => !item.url.includes('/page/'));
+          },
+        },
+        
+      }),
+    ],
+  ],
+
+  themeConfig:
+    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
+    ({
+      // navbar: {},
+      navbar: {
+        items: [
+          {
+            type: 'localeDropdown',
+            position: 'left',
+          },
+        ],
+      },
+      footer: {},
+      prism: {
+        theme: prismThemes.github,
+        darkTheme: prismThemes.dracula,
+      },
+      metadata: [
+        {name: 'google-site-verification', content: 'A3GEBO4Wur6jxNzR-hUJY4pBR2h1xQM3nFy4JC774p8'},
+        {name: 'keywords', content: 'ctrader, openapi, docs, trading, forex, crypto'},
+        {name: 'twitter:card', content: 'summary_large_image'},
+      ]
+    }),
+};
+
+export default config;
