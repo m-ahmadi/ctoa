@@ -1,4 +1,0 @@
-User-agent: *
-Disallow:
-
-Sitemap: https://m-ahmadi.github.io/ctoa/sitemap.xml
