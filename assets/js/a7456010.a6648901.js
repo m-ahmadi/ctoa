@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkctrader_openapi_docs=self.webpackChunkctrader_openapi_docs||[]).push([[235],{8552:e=>{e.exports=JSON.parse('{"name":"docusaurus-plugin-content-pages","id":"default"}')}}]);
