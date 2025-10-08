@@ -1,0 +1,38 @@
+setting up prettier
+
+npm install --save-dev --save-exact prettier
+node --eval "fs.writeFileSync('.prettierrc','{}\n')"
+node --eval "fs.writeFileSync('.prettierignore','# Ignore artifacts:\nbuild\ncoverage\n')"
+package.json
+{
+  "scripts": {
+    "fmt": "npm run prettier -- docs --write --ignore-unkown"
+  }
+}
+
+--------------------------------------------------
+setting up prettier pre-commit hook
+
+npm install --save-dev husky lint-staged
+npx husky init
+node --eval "fs.writeFileSync('.husky/pre-commit','npx lint-staged\n')"
+
+package.json
+{
+  "lint-staged": {
+    "**/*": "npm run fmt"
+  }
+}
+--------------------------------------------------
+set up github pages
+
+git branch gh-pages
+git push origin gh-pages
+git branch -d gh-pages
+repo -> Settings -> Pages -> Build and deployment ->
+	Source:		Deploy from a branch
+	Branch:		gh-pages		/ (root)
+add .npmrc file with: (because on my system: `package-lock=false` in ~/.npmrc)
+	package-lock=true
+done
+--------------------------------------------------
