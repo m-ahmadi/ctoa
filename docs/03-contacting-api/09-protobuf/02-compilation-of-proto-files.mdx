@@ -1,0 +1,232 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Compilation of `.proto` Files
+
+Now that we have installed the compiler and runtime, we can start compiling the
+`.proto` files. So where are these `.proto` files anyway?
+
+## Getting `.proto` Files
+
+The cTrader OpenAPI publishes its `.proto` files in the following GitHub
+repository:
+
+https://github.com/spotware/openapi-proto-messages
+
+Let's get a copy of them:
+
+```shell
+git clone https://github.com/spotware/openapi-proto-messages
+```
+
+:::note
+
+if you don't have [`git`](https://git-scm.com/downloads) installed on your
+system, you can download them manually by going into the page and click the
+**`<> Code`** button, and then the **`Download ZIP`** button.
+
+:::
+
+Now that we have the `.proto` files in a directory named
+`openapi-proto-messages`, it's time to compile them.
+
+## Compile `.proto` Files
+
+### Main Compiler
+
+<Tabs>
+<TabItem value="Windows">
+
+```
+protoc --proto_path=openapi-proto-messages --python_out=./ ^
+  OpenApiMessages.proto ^
+  OpenApiModelMessages.proto ^
+  OpenApiCommonMessages.proto ^
+  OpenApiCommonModelMessages.proto
+```
+
+</TabItem>
+
+<TabItem value="Linux">
+
+```
+protoc --proto_path=openapi-proto-messages --python_out=./ \
+  OpenApiMessages.proto \
+  OpenApiModelMessages.proto \
+  OpenApiCommonMessages.proto \
+  OpenApiCommonModelMessages.proto
+```
+
+</TabItem>
+</Tabs>
+
+Now we have the below compiled files:
+
+```
+OpenApiMessages_pb2.py
+OpenApiModelMessages_pb2.py
+OpenApiCommonMessages_pb2.py
+OpenApiCommonModelMessages_pb2.py
+```
+
+Which we will import in our Python code like below:
+
+```py
+import OpenApiMessages_pb2.py as OA
+import OpenApiModelMessages_pb2.py as OAModel
+import OpenApiCommonMessages_pb2.py as OACommon
+import OpenApiCommonModelMessages_pb2.py as OACommonModel
+```
+
+### JavaScript-Specific Compiler
+
+<Tabs>
+<TabItem value="Windows">
+
+```
+cd openapi-proto-messages
+
+pbjs -t json-module -o ../pb.compiled.js --no-beautify --no-comments ^
+  OpenApiMessages.proto ^
+  OpenApiModelMessages.proto ^
+  OpenApiCommonMessages.proto ^
+  OpenApiCommonModelMessages.proto
+```
+
+</TabItem>
+
+<TabItem value="Linux">
+
+```
+cd openapi-proto-messages
+
+pbjs -t json-module -o ../pb.compiled.js --no-beautify --no-comments \
+  OpenApiMessages.proto \
+  OpenApiModelMessages.proto \
+  OpenApiCommonMessages.proto \
+  OpenApiCommonModelMessages.proto
+```
+
+</TabItem>
+</Tabs>
+
+In the case of JavaScript, we will have one single file as the output of
+compilation:
+
+```
+pb.compiled.js
+```
+
+Which we will import in our Node.js code like below:
+
+```js
+var pb = require('./pb.compiled.js');
+```
+
+## Using Pre-Compiled `.proto` files from Official Python Package
+
+There is another way to use the compiled `.proto` files without actually
+compiling them ourselves, and that is using the already compiled `.proto` files
+which exist in the
+[cTrader OpenAPI Official Python Package](https://pypi.org/project/ctrader_open_api/).
+Since this way we can skip the compilation step, it's worth mentioning.
+
+Keep in mind we still need the runtime in this approach, but because when we
+install the official Python package, the runtime is installed with it (because
+the runtime is a dependency of the package) we are skipping that step as well.
+(two birds, one stone, but srsly, leave the poor birds alone!)
+
+So let's create a Python virtual environment for an isolated environment and
+activate it:
+
+```
+python -m venv .venv
+.venv/Scripts/activate
+```
+
+Now let's see what packages we have at this point:
+
+```
+pip list
+# Package    Version
+# ---------- -------
+# pip        21.2.3
+# setuptools 57.4.0
+```
+
+Now we will intsall the offical cTrader Python package, and after it's done, we
+will check again to see what packages were installed:
+
+```
+pip install ctrader_open_api
+pip list
+```
+
+Which will output a (somewhat) long list of packages that were just installed:
+
+```
+Package             Version
+------------------- --------
+...
+...
+protobuf            3.20.1
+...
+...
+```
+
+And there it is, that is the runtime being installed when you install the
+official Python package, and you can see that its version is much older that the
+runtime we installed ourself.
+
+:::note
+
+When you have an older runtime like here, you should know that it can't load
+`.proto` files compiled with a new compiler. Yes, we're not compiling anything
+here, and that was the whole point of this section, but hypothetically, if we
+did, it would be an example of Cross-Version runtime that was
+[mentioned earlier](./compiler-and-runtime#compiler-and-runtime-versions).
+
+:::
+
+After we install the official package, we can access the already compiled
+`.proto` files like below:
+
+```py
+import ctrader_open_api.messages.OpenApiMessages_pb2 as OA
+import ctrader_open_api.messages.OpenApiModelMessages_pb2 as OAModel
+import ctrader_open_api.messages.OpenApiCommonMessages_pb2 as OACommon
+import ctrader_open_api.messages.OpenApiCommonModelMessages_pb2 as OAModelCommon
+```
+
+### Convert to JSON
+
+As you might have guessed, this approach of using official Python package to
+skip the compilation step can be considered a solution if you're using Python,
+but what about another programming language? In that case, we can extract the
+information in `.proto` files and export it into a `JSON` format. Altough not an
+elegant solution, but still has some value due to it being easy and not needing
+the compilation step. (For example in a case where you just want to test
+something).
+
+Below is an example of doing so:
+
+```py
+import ctrader_open_api.messages.OpenApiModelMessages_pb2 as OAModel
+import json
+
+# extract info
+target_keys = filter(lambda i: i.startswith('ProtoOA'), dir(OAModel))
+ones_with_keyval = filter(lambda k: hasattr(getattr(OAModel,k),'keys'), target_keys)
+out = {}
+for key in ones_with_keyval:
+  prop = getattr(OAModel, key)
+  out[key] = dict(zip(prop.keys(), prop.values()))
+
+# write to file
+with open('OAModel.json', 'w', encoding='utf-8') as f:
+  json.dump(out, f, ensure_ascii=False, indent=2)
+```
+
+Keep in mind, in this approach, the naming of the messages change from
+`PascalCase` to `UPPER_SNAKE_CASE` (aka `SCREAMING_SNAKE_CASE`), unless you
+modify the code otherwise.

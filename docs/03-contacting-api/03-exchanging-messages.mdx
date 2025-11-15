@@ -1,0 +1,340 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Exchanging Messages
+
+Once we [established a connection](./establishing-connection), we can send a
+message to the server. You might be wondering what we mean by a message and how
+are we going to send it.
+
+## WebSocket Basics
+
+In order to better understand the mechanism of sending messages, let's forget
+about the cTrader OpenAPI server for the moment and connect to another server.
+
+The endpoint that we're going to connect to is `'wss://echo.websocket.org'`.
+This is what's called an echo server, meaning, whatever message the client
+sends, it will send the exact same message back to the client.
+
+Once the connection is open, we start sending the messages. Notice that we're
+now "listening" for messages that server is sending back.
+
+<Tabs>
+<TabItem value="JavaScript">
+
+```javascript
+const ws = new WebSocket('wss://echo.websocket.org');
+
+// util functions
+const { log } = console;
+const sleep = (secs) => new Promise((r) => setTimeout(r, secs * 1000));
+
+ws.onopen = function () {
+  log('connected to server');
+
+  let msg = 'hello';
+  ws.send(msg);
+  log('client sent a message:', msg);
+
+  msg = 'hi';
+  ws.send(msg);
+  log('client sent a message:', msg);
+};
+
+ws.onmessage = function (event) {
+  const serverMsg = event.data;
+  log(`server sent a message: ${serverMsg}`);
+};
+
+(async () => {
+  while (true) await sleep(0.25);
+})();
+```
+
+</TabItem>
+
+<TabItem value="Python">
+
+```py
+import asyncio as aio
+from websockets.asyncio.client import connect # pip install websockets
+
+async def main():
+  async with connect('wss://echo.websocket.org') as ws:
+    print('connected to server')
+
+    msg = 'hello'
+    await ws.send(msg)
+    print('client sent a message:', msg)
+
+    msg = 'hi'
+    await ws.send(msg)
+    print('client sent a message:', msg)
+
+    async for server_msg in ws:
+      print('server sent a message:', server_msg)
+
+aio.run(main())
+```
+
+</TabItem>
+</Tabs>
+
+Results from running the code:
+
+```
+connected to server
+client sent a message: hello
+client sent a message: hi
+server sent a message: hello
+server sent a message: hi
+```
+
+### Underlying Type of Messages
+
+Let's focus for a moment to the type of messages that are being exchanged, i.e.
+the messages sent by client to server or vice versa.
+
+Let's only change some parts of previous code example and run it again.
+
+<Tabs>
+<TabItem value="JavaScript">
+
+```js
+ws.onopen = function () {
+  console.log('connected to server');
+  ws.send('hello');
+  ws.send(2573);
+  ws.send(true);
+};
+
+ws.onmessage = function (event) {
+  const serverMsg = event.data;
+  const msgType = typeof serverMsg;
+  console.log(`server sent a message: ${serverMsg} (${msgType})`);
+};
+```
+
+</TabItem>
+
+<TabItem value="Python">
+
+```py
+import asyncio as aio
+from websockets.asyncio.client import connect # pip install websockets
+
+async def main():
+  async with connect('wss://echo.websocket.org') as ws:
+    print('connected to server')
+
+    await ws.send('hello')
+    await ws.send(2573)
+    await ws.send(True)
+
+    async for server_msg in ws:
+      msg_type = type(server_msg)
+      print(f'server sent a message: {server_msg} ({msg_type})')
+
+aio.run(main())
+```
+
+:::danger[Error]
+
+TypeError: data must be str, bytes, iterable, or async iterable
+
+:::
+
+</TabItem>
+</Tabs>
+
+Results from running the code:
+
+```
+connected to server
+server sent a message: hello (string)
+server sent a message: 2573 (string)
+server sent a message: true (string)
+```
+
+As you see, even when we're sending a message with the type of `number` or
+`int`, what the server sends back is always `string` or `str`. This is
+notewortyh because it demonstrates that messages being exchanged between client
+and server are (usually) strings. Techincally, there are
+[other types of messages](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/send#data)
+that can be transmitted over the network, but in our case of cTrader OpenAPI
+server, we deal only with strings.
+
+## Format of Messages
+
+So far, we established what a message is, and how to send one. Now let's shift
+our focus back to the cTrader OpenAPI server and go back to the
+[endpoint](./endpoints#an-example) we were using
+[earlier](./establishing-connection), and let's listen again for incomeing
+server messages.
+
+Now let's send a message to the cTrader OpenAPI server, and see wha happens:
+
+<Tabs>
+<TabItem value="JavaScript">
+
+```js
+const ws = new WebSocket('wss://live.ctraderapi.com:5036');
+
+// util functions
+const { log } = console;
+const sleep = (secs) => new Promise((r) => setTimeout(r, secs * 1000));
+
+ws.onopen = function () {
+  log('connected to server');
+  ws.send('hello');
+};
+
+ws.onmessage = function (event) {
+  const serverMsg = event.data;
+  log(`server sent a message: ${serverMsg}`);
+};
+
+ws.onclose = function () {
+  log('connection closed');
+};
+
+(async () => {
+  while (true) await sleep(0.25);
+})();
+```
+
+</TabItem>
+<TabItem value="Python">
+
+```py
+import asyncio as aio
+from websockets.asyncio.client import connect # pip install websockets
+
+async def main():
+  async with connect('wss://live.ctraderapi.com:5036') as ws:
+    print('connected to server')
+
+    await ws.send('hello')
+
+    async for server_msg in ws:
+      print(f'server sent a message: {server_msg}')
+
+aio.run(main())
+```
+
+</TabItem>
+</Tabs>
+
+Results:
+
+```
+connected to server
+server sent a message: {"payloadType":2142,"payload":{"errorCode":
+                       "INVALID_REQUEST","description":"Malformed JSON message
+                       at 1:6"}}
+connection closed
+```
+
+You can see that server did respond to our message, but it sent a long text that
+seems to have a format. That format is
+[JSON](https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/JSON).
+When we want to send a message to the server, we cannot just send any string
+like `'hello'`. Our messages must have a format and a structure to them, exactly
+like how server responded to us. So we established that our meessages need to be
+in JSON format, but what's the structure then?
+
+The message must be a JSON object with some fields. One of these fields is
+`payloadType`, which is an integer number, and is a neccessary field that must
+be present in all message. Another common (but not present in all messages) is
+`payload`, which is another JSON object with its own fields.
+
+The server only understands a
+[pre-defined set of messages](./dictionary-of-all-messages), so by specifing the
+`payloadType` field, your're telling the server which message you're trying to
+send. Now we're able to select a specific message to send, but how would we send
+extra information that a message may need to convey? That's what's the `payload`
+field is for. What field(s) should the `payload` object have depends on what
+`payloadType` is being send.
+
+## Sending the First Proper Message
+
+The first message a client sends to server is a `payloadType` of `2100`, which
+is called "Requesting application authentication". This message must have a
+`payload` with two required fields, one is `clientId`, and the other is
+`clientSecret`, and both fields must have string values which are part of the
+credentials you must acquire to be able to identify yourself to the server. So
+lets' send our firt proper message to the server.
+
+<Tabs>
+<TabItem value="JavaScript">
+
+```js
+ws.onopen = function () {
+  // ...
+  const clientMsg = {
+    payloadType: 2100,
+    payload: {
+      clientId: '127f2f93c5c36feeed22a97174ce1f03bee9a71892caf6efca447415',
+      clientSecret: '32186df996aee51ab620852086f160ee67e36c7c673bd312b2',
+    },
+  };
+  ws.send(JSON.stringify(clientMsg));
+};
+```
+
+</TabItem>
+<TabItem value="Python">
+
+```py
+import json
+import asyncio as aio
+from websockets.asyncio.client import connect # pip install websockets
+
+async def main():
+  async with connect('wss://live.ctraderapi.com:5036') as ws:
+    print('connected to server')
+
+    client_msg = {
+      'payloadType': 2100,
+      'payload': {
+        'clientId': '127f2f93c5c36feeed22a97174ce1f03bee9a71892caf6efca447415',
+        'clientSecret': '32186df996aee51ab620852086f160ee67e36c7c673bd312b2',
+      },
+    }
+    await ws.send(json.dumps(client_msg))
+
+    async for server_msg in ws:
+      print(f'server sent a message: {server_msg}')
+```
+
+</TabItem>
+</Tabs>
+
+Results from running the code:
+
+```
+connected to server
+server sent a message: {"payloadType":2101}
+```
+
+:::note
+
+Obviously you must provide your [real credentials](./acquiring-credentials),
+otherwise server's respond will be:
+
+```
+{
+  "payloadType": 2142,
+  "payload": {
+    "errorCode": "CH_CLIENT_AUTH_FAILURE",
+    "description": "clientId or clientSecret is incorrect"
+  }
+}
+```
+
+:::
+
+As you see from the results, the server repsonds with a `payloadType` of `2101`,
+which means success. We will cover this in more detail later, but for now you
+should know that a `payloadType` that is one number greater than the one we send
+means success, and a `payloadType` of `2142` means failure.
