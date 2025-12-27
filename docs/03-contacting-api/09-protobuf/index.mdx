@@ -1,0 +1,31 @@
+# Protobuf
+
+So far we learned about the `JSON` format of messages that we were exchanging
+with the server. There is also another format that we can use, and that is
+`Protobuf`. One reason we started with `JSON` format, was that it's a simpler
+approach, and therefore makes the code examples shorter, which in turn allows
+the reader to focus more on the bigger picture being described. You might ask
+then what's the point of using this other format. Let's start with a very basic
+comparison table:
+
+| Format     | Size  | Hassle of Using | When Makes Sense      |
+| ---------- | ----- | --------------- | --------------------- |
+| `JSON`     | Large | Almost None     | Small amount of users |
+| `Protobuf` | Small | A Lot           | Large amount of users |
+
+The messages in `Protobuf` format are much shorter in size compared to `JSON`,
+and that results in less data being transmitted over the network. It might seem
+that using the `Protobuf` is the absolute better choice, but it's not that
+simple. One can argue against the use of `Protobuf` in some cases. Using
+`Protobuf` makes more sense when there are multiple clients connecting to the
+server, and by more we mean thousands and thousands more. Usualy if your program
+has less than a 1000 clients, the difference between trafic being saved is not
+worth the hassles of dealing with `Protobuf`. We later see an example of
+comparing the size of messages in these two strucures and a way to roughly
+calculate the amount of traffic base on the `RATE_LIMIT` concept.
+
+`Protobuf` is a data interchange language developed by Google, and it has its
+own syntax for defining data structures and rules and relationship between them.
+The contents in this langauge are written in files with a `.proto` extension. In
+order to use these files in a programming language, they must be compiled first,
+and to do that we need to install its compiler.

@@ -1,0 +1,110 @@
+# Basic Python example of how to connect to server (JSON)
+
+This script does not use official package with Protobuf communication but rather
+uses JSON communication.
+
+Things to do before running the script:
+
+1. `pip install websockets`
+2. put `credentials.json` right beside the script
+3. put `OAModel.json` right beside the script (check
+   [below](#how-to-get-the-json-definition-files) to see how to create it)
+
+```python
+import json
+import asyncio as aio
+from websockets.asyncio.client import connect # pip install websockets
+
+readjson = lambda path: json.load(open(path))
+creds = readjson('./credentials.json')
+OAModel = readjson('./OAModel.json')
+payloadTypes = OAModel['ProtoOAPayloadType']
+
+
+# set up a function for constructing client messages
+def construct_msg(payloadType, fields={}):
+  msg = {
+    'payloadType': payloadTypes[payloadType],
+    'payload': {
+      'ctidTraderAccountId': creds['accountId'],
+      'accessToken': creds['accessToken'],
+      **fields
+    }
+  }
+  return json.dumps(msg)
+
+
+async def main():
+  async with connect('wss://live.ctraderapi.com:5036') as ws:
+    print('Application authentication')
+    # we don't use the `construct_msg()` function for the first message,
+    # because its payload is different from the rest of the messages
+    client_msg = {
+      'payloadType': payloadTypes['PROTO_OA_APPLICATION_AUTH_REQ'],
+      'payload': {
+        'clientId': creds['clientId'],
+        'clientSecret': creds['clientSecret']
+      }
+    }
+    await ws.send(json.dumps(client_msg))
+    server_msg = json.loads(await ws.recv())
+    if server_msg['payloadType'] != payloadTypes['PROTO_OA_APPLICATION_AUTH_RES']:
+      print('Application authentication failed')
+      print(json.dumps(server_msg['payload'], indent=2))
+      exit()
+
+    print('Account authentication')
+    client_msg = construct_msg('PROTO_OA_ACCOUNT_AUTH_REQ')
+    await ws.send(client_msg)
+    server_msg = json.loads(await ws.recv())
+    if server_msg['payloadType'] != payloadTypes['PROTO_OA_ACCOUNT_AUTH_RES']:
+      print('Account authentication failed')
+      print(json.dumps(server_msg['payload'], indent=2))
+      exit()
+
+    print('Getting symbols list')
+    client_msg = construct_msg('PROTO_OA_SYMBOLS_LIST_REQ')
+    await ws.send(client_msg)
+    server_msg = json.loads(await ws.recv())
+    if server_msg['payloadType'] != payloadTypes['PROTO_OA_SYMBOLS_LIST_RES']:
+      print('Getting symbols failed')
+
+    print('Saving symbol list to file')
+    symbol_data = server_msg['payload']['symbol']
+    with open('symbols.json', 'w', encoding='utf-8') as f:
+      json.dump(symbol_data, f, ensure_ascii=False, indent=2)
+
+aio.run(main())
+```
+
+## How to get the JSON definition files.
+
+Run below snippet to create the `OAModel.json` file. Before running the snippet
+you need to have cTrader OpenAPI Python package installed:
+`pip install ctrader_open_api`
+
+:::note
+
+When using `JSON` communication, we don't need the `ctrader_open_api` package
+anymore. We're only installing it to extract the neccessary information into the
+`OAModel.json` file and we no longer need it afterwards so we can uninstall it
+with `pip uninstall ctrader_open_api -y` after we ran the snippet.
+
+:::
+
+```python
+import ctrader_open_api.messages.OpenApiModelMessages_pb2 as OAModel
+import json
+
+# extract info
+target_keys = filter(lambda i: i.startswith('ProtoOA'), dir(OAModel))
+ones_with_keyval = filter(lambda k: hasattr(getattr(OAModel,k),'keys'), target_keys)
+out = {}
+for key in ones_with_keyval:
+  prop = getattr(OAModel, key)
+  out[key] = dict(zip(prop.keys(), prop.values()))
+
+# write to file
+with open('OAModel.json', 'w', encoding='utf-8') as f:
+  json.dump(out, f, ensure_ascii=False, indent=2)
+```

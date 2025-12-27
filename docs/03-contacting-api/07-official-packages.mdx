@@ -1,0 +1,138 @@
+# Official Packages
+
+## Python
+
+| Page   | URL                                        |
+| ------ | ------------------------------------------ |
+| PyPi   | https://pypi.org/project/ctrader_open_api/ |
+| Github | https://github.com/spotware/OpenApiPy      |
+
+The official Python package uses a library for networking called
+[Twisted](https://twisted.org/) under the hood. Altough Twisted is a very old
+library and there are far better alternatives, you can still get a lot done with
+it.
+
+### Usage Code Example
+
+```py
+from ctrader_open_api import Client, Protobuf, TcpProtocol, EndPoints
+import ctrader_open_api.messages.OpenApiMessages_pb2 as OA
+import ctrader_open_api.messages.OpenApiModelMessages_pb2 as OAModel
+import ctrader_open_api.messages.OpenApiCommonMessages_pb2 as OACommon
+import ctrader_open_api.messages.OpenApiCommonModelMessages_pb2 as OAModelCommon
+from twisted.internet import reactor
+
+import json
+
+credentials = json.load(open('credentials.json'))
+client = Client(EndPoints.PROTOBUF_LIVE_HOST, EndPoints.PROTOBUF_PORT,
+                TcpProtocol)
+
+def main():
+  print('ready to do something')
+  reactor.stop()
+
+def onAccAuth(message):
+  print('account authenticated')
+  main()
+
+def onAppAuth(message):
+  print('app authenticated')
+  req = OA.ProtoOAAccountAuthReq()
+  req.ctidTraderAccountId = credentials['accountId']
+  req.accessToken = credentials['accessToken']
+  deferred = client.send(req)
+  deferred.addCallbacks(onAccAuth, onError)
+
+def onError(failure):
+  print('err: ', repr(failure.value))
+
+def connected(client):
+  print('connected')
+  req = OA.ProtoOAApplicationAuthReq()
+  req.clientId = credentials['clientId']
+  req.clientSecret = credentials['clientSecret']
+  deferred = client.send(req)
+  deferred.addCallbacks(onAppAuth, onError)
+
+def disconnected(client, reason):
+  print('disconnected: ', reason)
+
+def onMsg(client, message):
+  ignores = [i.payloadType for i in [OACommon.ProtoHeartbeatEvent(),
+                                     OA.ProtoOAAccountAuthRes(),
+                                     OA.ProtoOAApplicationAuthRes()]]
+  if message.payloadType in ignores:
+    return
+  print('message received')
+
+client.setConnectedCallback(connected)
+client.setDisconnectedCallback(disconnected)
+client.setMessageReceivedCallback(onMsg)
+client.startService()
+reactor.run()
+
+```
+
+### Correct Name of PyPi Package
+
+The name of the package is actually `ctrader_open_api` (separated by underline),
+but even if you use the name `ctrader-open-api` (separated by dash) to install
+it, it would still work. The reason for this is because the dash characters get
+automatically converted to underlines in the process. Since this could be a
+source of confusion, it's worth covering it here.
+
+Let's create an isolated environment and get a report of what packages would be
+installed after running a `pip install` command (`--report` option), but without
+actually installing anything (`--dry-run` option), and then compare the two
+reports. So we install both a package named `ctrader_open_api`, and another
+named `ctrader-open-api`, and will store the report into files.
+
+```
+mkdir test && cd test
+python -m venv .env
+.env\Scripts\activate
+pip install ctrader_open_api --dry-run -I --report f1.json
+pip install ctrader-open-api --dry-run -I --report f2.json
+```
+
+And the we examine the two report files like below:
+
+```py
+import json
+
+def print_installed_pkgs(report_file)
+  o = json.load(open(report_file, encoding='utf-8-sig'))
+  a = [i['metadata']['name'] +'=='+ i['metadata']['version']
+    for i in o['install']]
+  print('\n'.join(a))
+
+print('installed pkgs after `pip install ctrader_open_api`')
+print_installed_pkgs_from_report_file('f1.json')
+print('-------------------------')
+print('installed pkgs after `pip install ctrader-open-api`')
+print_installed_pkgs_from_report_file('f2.json')
+```
+
+As you can see below, both will install the same exact things.
+
+```
+installed pkgs after `pip install ctrader_open_api`
+ctrader_open_api==0.9.2
+inputimeout==1.0.4
+protobuf==3.20.1
+...
+-------------------------
+installed pkgs after `pip install ctrader-open-api`
+ctrader_open_api==0.9.2
+inputimeout==1.0.4
+protobuf==3.20.1
+...
+```
+
+## C#
+
+| Page          | Link                                                     |
+| ------------- | -------------------------------------------------------- |
+| GitHub        | https://github.com/spotware/OpenAPI.Net                  |
+| Official Docs | https://help.ctrader.com/open-api/net_SDK/net-sdk-index/ |

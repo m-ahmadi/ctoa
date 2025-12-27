@@ -1,0 +1,31 @@
+# Extracting all the information regarding trade history
+
+I will describe the sequence of client-server messages that relate to extracting
+all the information regarding deal history
+
+you send `ProtoOADealListReq` server sends `ProtoOADealListRes` back which
+contains a deal field which is an array of `ProtoOADeal`, each item in the array
+contains an `orderId`, a `positionId` and a `dealId`
+
+now you must iterate through the deal field and send a `ProtoOAOrderDetailsReq`
+message for each item
+
+in response to each `ProtoOAOrderDetailsReq` server sends back a
+`ProtoOAOrderDetailsRes` which contains two fields. one is a `deal` field which
+is just the same as an item of `deal` field of the `ProtoOADealListRes`. another
+field is `order` which contains more information about details of the order
+
+this is all the info available about the past deals, so in summary the related
+messages you need to study are:
+
+```
+ProtoOADealListReq
+ProtoOADealListRes
+
+ProtoOAOrderDetailsReq
+ProtoOAOrderDetailsRes
+
+# these might also come in handy (if you want current orders and positions)
+ProtoOAOrderListReq
+ProtoOAReconcileReq
+```
