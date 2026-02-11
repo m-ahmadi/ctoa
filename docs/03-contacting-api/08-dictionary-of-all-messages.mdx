@@ -1,0 +1,127 @@
+# Dictionary of All Messages
+
+Client and server can only send each other messages that they have previously
+agreed upon. A message is nothing more than a number that's been assigned to a
+way of sending/receiving data between client and server.
+
+As we saw in [exchanging messages](./exchanging-messages), through the
+`payloadType` field we can select a message to send to the server, and depending
+on which message we select, the `payload` is expected to have certain fields.
+
+Here we will see the entire messages that client and server can understand. In a
+way these messages are the language of communication between client and server.
+For more information about a message, check the
+[API Reference](https://help.ctrader.com/open-api/messages/).
+
+| Char | Meaning                                                                                |
+| ---- | -------------------------------------------------------------------------------------- |
+| 👉   | A message that client sends to server, requesting something.                           |
+| 👈   | A message that server sends to client, (usually) in reponse to a client's request.     |
+| 🔔   | A message that server sends to client without client specifically requesting anything. |
+
+:::info
+
+If a message has both 👉 and 👈, it means once you send the request message,
+server will respond with a specific message addressing your request. In other
+words, for every request, there is a response.
+
+If a message only has a 👉, it means it's a type of message that doesn't have a
+specific response from the server. (You just send the message and that's it).
+
+:::
+
+| Message Name <small>(without `ProtoOA`)</small> | Req | Res | Event |
+| ----------------------------------------------- | --- | --- | ----- |
+| AccountAuth                                     | 👉  | 👈  |
+| AccountDisconnect                               |     |     | 🔔    |
+| AccountLogout                                   | 👉  | 👈  |
+| AccountsTokenInvalidated                        |     |     | 🔔    |
+| AmendOrder                                      | 👉  |     |
+| AmendPositionSLTP                               | 👉  |     |
+| ApplicationAuth                                 | 👉  | 👈  |
+| AssetClassList                                  | 👉  | 👈  |
+| AssetList                                       | 👉  | 👈  |
+| CancelOrder                                     | 👉  |     |
+| CashFlowHistoryList                             | 👉  | 👈  |
+| ClientDisconnect                                |     |     | 🔔    |
+| ClosePosition                                   | 👉  |     |
+| DealList                                        | 👉  | 👈  |
+| DealListByPositionId                            | 👉  | 👈  |
+| DealOffsetList                                  | 👉  | 👈  |
+| Depth                                           |     |     | 🔔    |
+| Error                                           |     | 👈  |
+| Execution                                       |     |     | 🔔    |
+| ExpectedMargin                                  | 👉  | 👈  |
+| GetAccountListByAccessToken                     | 👉  | 👈  |
+| GetCtidProfileByToken                           | 👉  | 👈  |
+| GetDynamicLeverageByID                          | 👉  | 👈  |
+| GetPositionUnrealizedPnL                        | 👉  | 👈  |
+| GetTickData                                     | 👉  | 👈  |
+| GetTrendbars                                    | 👉  | 👈  |
+| MarginCallList                                  | 👉  | 👈  |
+| MarginCallTrigger                               |     |     | 🔔    |
+| MarginCallUpdate                                | 👉  | 👈  | 🔔    |
+| MarginChanged                                   |     |     | 🔔    |
+| NewOrder                                        | 👉  |     |
+| OrderDetails                                    | 👉  | 👈  |
+| OrderError                                      |     |     | 🔔    |
+| OrderList                                       | 👉  | 👈  |
+| OrderListByPositionId                           | 👉  | 👈  |
+| Reconcile                                       | 👉  | 👈  |
+| RefreshToken                                    | 👉  | 👈  |
+| Spot                                            |     |     | 🔔    |
+| SubscribeDepthQuotes                            | 👉  | 👈  |
+| SubscribeLiveTrendbar                           | 👉  | 👈  |
+| SubscribeSpots                                  | 👉  | 👈  |
+| SymbolById                                      | 👉  | 👈  |
+| SymbolCategoryList                              | 👉  | 👈  |
+| SymbolChanged                                   |     |     | 🔔    |
+| SymbolsForConversion                            | 👉  | 👈  |
+| SymbolsList                                     | 👉  | 👈  |
+| Trader                                          | 👉  | 👈  |
+| TraderUpdated                                   |     |     | 🔔    |
+| TrailingSLChanged                               |     |     | 🔔    |
+| UnsubscribeDepthQuotes                          | 👉  | 👈  |
+| UnsubscribeLiveTrendbar                         | 👉  | 👈  |
+| UnsubscribeSpots                                | 👉  | 👈  |
+| Version                                         | 👉  | 👈  |
+
+## How Table Was Generated
+
+```py
+import ctrader_open_api.messages.OpenApiMessages_pb2 as OA
+
+prefix = 'ProtoOA'
+a = dir(OA)
+b = [i.split(prefix)[1] for i in filter(lambda i: i.startswith(prefix), a)]
+
+reqs = filter(lambda i: i.endswith('Req'), b)
+ress = filter(lambda i: i.endswith('Res'), b)
+evts = filter(lambda i: i.endswith('Event'), b)
+
+def populate(d, a, cutend, mark):
+  for k in a:
+    name = k[:-cutend]
+    if name not in d:
+      d[name] = []
+    d[name].append(mark)
+
+d = {}
+populate(d, reqs, 3, '👉')
+populate(d, ress, 3, '👈')
+populate(d, evts, 5, '🔔')
+
+
+# generate markdown
+rows = []
+idxbychr = {'👉':1,'👈':2,'🔔':3}
+for k, v in d.items():
+  row = [k,'','','']
+  for i in v:
+    row[ idxbychr[i] ] = i
+  rows.append(row)
+sort(rows, key=str)
+markdown_rows = '\n'.join(map(lambda i: ' | '.join(i), rows))
+
+print(markdown_rows)
+```

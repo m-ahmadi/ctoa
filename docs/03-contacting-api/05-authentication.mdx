@@ -1,0 +1,284 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Authentication
+
+First put the [credentials we acquired](./acquiring-credentials) in a file named
+`credentials.json` for example.
+
+```json
+{
+  "accountId": 12345678,
+  "clientId": "",
+  "clientSecret": "",
+  "accessToken": "",
+  "refreshToken": ""
+}
+```
+
+## Application Authentication
+
+The only messages that you can send to server without application
+authenthication are:
+
+- [`ApplicationAuth`](https://help.ctrader.com/open-api/messages/#protooaapplicationauthreq)
+- [`RefreshToken`](https://help.ctrader.com/open-api/messages/#protooarefreshtokenreq)
+- [`Version`](https://help.ctrader.com/open-api/messages/#protooaversionreq)
+
+<Tabs>
+<TabItem value="JavaScript">
+
+```js
+const { clientId, clientSecret } = require('./credentials.json');
+
+const ws = new WebSocket('wss://live.ctraderapi.com:5036');
+
+// util functions
+const { log } = console;
+const sleep = (secs) => new Promise((r) => setTimeout(r, secs * 1000));
+
+const CHECK_INTERVAL_SECS = 1;
+let appAuthenticated = false;
+
+ws.onopen = function () {
+  log('connected to server');
+  ws.send(
+    JSON.stringify({
+      payloadType: 2100,
+      payload: { clientId, clientSecret },
+    }),
+  );
+  log('requested application authentication');
+};
+
+ws.onmessage = function (e) {
+  const serverMsg = JSON.parse(e.data);
+
+  if (serverMsg.payloadType === 2142) {
+    log('server responded with error:', serverMsg.payLoad);
+    return;
+  }
+
+  if (serverMsg.payloadType === 2101) {
+    log('application authentication completed');
+    appAuthenticated = true;
+  }
+};
+
+ws.onclose = function ({ code, reason, wasClean }) {
+  log('connection closed', { code, reason, wasClean });
+};
+
+(async () => {
+  while (true) {
+    await sleep(0);
+    if (ws.readyState !== WebSocket.OPEN) continue;
+    if (!appAuthenticated) continue;
+
+    log('partially authenticated');
+
+    await sleep(CHECK_INTERVAL_SECS);
+  }
+})();
+```
+
+</TabItem>
+
+<TabItem value="Python">
+
+```py
+import json
+import asyncio as aio
+from websockets.asyncio.client import connect # pip install websockets
+
+creds = json.load(open('./credentials.json'))
+
+async def main():
+  async with connect('wss://live.ctraderapi.com:5036') as ws:
+    print('connected to server')
+
+    client_msg = {
+      'payloadType': 2100,
+      'payload': {
+        'clientId': creds['clientId'],
+        'clientSecret': creds['clientSecret']
+      }
+    }
+
+    print('requested application authentication')
+    await ws.send(json.dumps(client_msg))
+
+    server_msg = json.loads(await ws.recv())
+
+    if server_msg['payloadType'] != 2101:
+      print('application authentication failed')
+      print(json.dumps(server_msg['payload'], indent=2))
+      exit()
+
+    print('application authentication completed')
+
+
+    print('partially authenticated')
+
+aio.run(main())
+```
+
+</TabItem>
+</Tabs>
+
+Results from running the code:
+
+```
+connected to server
+requested application authentication
+application authentication completed
+partially authenticated
+```
+
+## Application and Account Authentication
+
+<Tabs>
+<TabItem value="JavaScript">
+
+```js
+const {
+  clientId,
+  clientSecret,
+  accountId: ctidTraderAccountId,
+  accessToken,
+} = require('./credentials.json');
+
+const ws = new WebSocket('wss://live.ctraderapi.com:5036');
+
+// util functions
+const { log } = console;
+const sleep = (secs) => new Promise((r) => setTimeout(r, secs * 1000));
+
+const CHECK_INTERVAL_SECS = 1;
+let fullyAuthenticated = false;
+
+ws.onopen = function () {
+  log('connected to server');
+  ws.send(
+    JSON.stringify({
+      payloadType: 2100,
+      payload: { clientId, clientSecret },
+    }),
+  );
+  log('requested application authentication');
+};
+
+ws.onmessage = function (e) {
+  const serverMsg = JSON.parse(e.data);
+
+  if (serverMsg.payloadType === 2142) {
+    log('server responded with error:', serverMsg.payLoad);
+    return;
+  }
+
+  if (serverMsg.payloadType === 2101) {
+    log('application authentication completed');
+
+    ws.send(
+      JSON.stringify({
+        payloadType: 2102,
+        payload: { ctidTraderAccountId, accessToken },
+      }),
+    );
+    log('requested account authentication');
+  }
+
+  if (serverMsg.payloadType === 2103) {
+    log('account authentication completed');
+    fullyAuthenticated = true;
+  }
+};
+
+ws.onclose = function ({ code, reason, wasClean }) {
+  log('connection closed', { code, reason, wasClean });
+};
+
+(async () => {
+  while (true) {
+    await sleep(0);
+    if (ws.readyState !== WebSocket.OPEN) continue;
+    if (!fullyAuthenticated) continue;
+
+    log('fully authenticated and ready for more communication with the server');
+
+    await sleep(CHECK_INTERVAL_SECS);
+  }
+})();
+```
+
+</TabItem>
+
+<TabItem value="Python">
+
+```py
+import json
+import asyncio as aio
+from websockets.asyncio.client import connect # pip install websockets
+
+creds = json.load(open('./credentials.json'))
+
+async def main():
+  async with connect('wss://live.ctraderapi.com:5036') as ws:
+    print('connected to server')
+
+    # app auth
+    client_msg = {
+      'payloadType': 2100,
+      'payload': {
+        'clientId': creds['clientId'],
+        'clientSecret': creds['clientSecret']
+      }
+    }
+    print('requested application authentication')
+    await ws.send(json.dumps(client_msg))
+    server_msg = json.loads(await ws.recv())
+    if server_msg['payloadType'] != 2101:
+      print('application authentication failed')
+      print(json.dumps(server_msg['payload'], indent=2))
+      exit()
+    print('application authentication completed')
+
+    # account auth
+    client_msg = {
+      'payloadType': 2102,
+      'payload': {
+        'ctidTraderAccountId': creds['accountId'],
+        'accessToken': creds['accessToken'],
+      }
+    }
+    await ws.send(json.dumps(client_msg))
+    print('requested account authentication')
+    server_msg = json.loads(await ws.recv())
+    if server_msg['payloadType'] != 2103:
+      print('account authentication failed')
+      print(json.dumps(server_msg['payload'], indent=2))
+      exit()
+    print('account authentication completed')
+
+
+    print('fully authenticated and ready for more communication with the server')
+
+aio.run(main())
+```
+
+</TabItem>
+</Tabs>
+
+Results from running the code:
+
+```
+connected to server
+requested application authentication
+application authentication completed
+requested account authenthication
+account authentication completed
+fully authenticated and ready for more communication with the server
+fully authenticated and ready for more communication with the server
+fully authenticated and ready for more communication with the server
+fully authenticated and ready for more communication with the server
+```

@@ -1,0 +1,172 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Establishing a Connection
+
+In order to contact the API server, we need to open a socket connection to an
+[endpoint](./endpoints).
+
+:::note
+
+We are using the [endpoint](./endpoints#an-example) deisgnated for live accounts
+and JSON messaging. We are also running our program endlessly using an
+[infinite loop](../programming-concepts#infinite-loop).
+
+:::
+
+<Tabs>
+  <TabItem value="JavaScript" label="JavaScript" default>
+
+```js
+const ws = new WebSocket('wss://live.ctraderapi.com:5036');
+
+// util functions
+const { log } = console;
+const sleep = (secs) => new Promise((r) => setTimeout(r, secs * 1000));
+
+ws.onopen = function () {
+  log('connected to server');
+};
+
+ws.onclose = function () {
+  log('connection closed');
+};
+
+(async () => {
+  while (true) await sleep(0.25);
+})();
+```
+
+  </TabItem>
+  <TabItem value="Python">
+
+    :::note
+
+    Install the `websockets` package with `pip install websockets`.
+
+    :::
+
+```py
+import asyncio as aio
+import websockets
+from websockets.asyncio.client import connect
+
+async def main():
+  async with connect('wss://echo.websocket.org') as ws:
+    print('connected to server')
+
+    while True:
+      await aio.sleep(0)
+
+      if ws.state != websockets.State.OPEN:
+        print('connection closed')
+        break
+
+aio.run(main())
+```
+
+  </TabItem>
+
+</Tabs>
+
+## Why Connection Closes Automatically
+
+If you ran previous code examples, you'll notice that the script runs
+sucessfully and prints the following:
+
+```
+connected to server
+connection closed
+```
+
+So it seems that the connection is opened at first, but then after some time
+passes, it gets closed automatically.
+
+Let's adjust the code to measure the time between the events happening. We want
+to measure the time taken between following events:
+
+- from when script is first run, until connection is opened
+- from when connection is opened, until it's closed
+
+<Tabs>
+<TabItem value="JavaScript">
+
+```js
+// util functions
+const round = (n, dp) => +n.toFixed(dp);
+
+let t = Date.now();
+
+ws.onopen = function () {
+  // ...
+  log(
+    'it took',
+    round((Date.now() - t) / 1000, 1),
+    'secs to open the connection',
+  );
+  t = Date.now();
+};
+
+ws.onclose = function () {
+  // ...
+  const secsPassed = round((Date.now() - t) / 1000, 1);
+  log('connection stayed open for', secsPassed, 'seconds before it was closed');
+};
+```
+
+</TabItem>
+
+<TabItem value="Python">
+
+```py
+from timeit import default_timer as timer
+
+async def main():
+  t = timer()
+
+  async with connect('wss://live.ctraderapi.com:5036') as ws:
+    # ...
+
+    secs_passed = round(timer() - t, 1)
+    print('it took', secs_passed, 'seconds to open the connection')
+    t = timer()
+
+    while True:
+      await aio.sleep(0)
+
+      if ws.state != websockets.State.OPEN:
+        # ...
+        secs_passed = round(timer() - t, 1)
+        print('connection stayed open for', secs_passed,
+          'seconds before it was closed')
+        break
+```
+
+</TabItem>
+
+</Tabs>
+
+Results from running the code:
+
+```
+connected to server
+it took 0.8 seconds to open the connection
+connection closed
+connection stayed open for 29.8 seconds before it was closed
+```
+
+As the results show, the connection gets closed after being open for 30 seconds.
+It is actually the server that closes the connection.
+
+When the server notices that a client that was previously connected, hasn't been
+sending any messages for awhile, it decides to close the connection to that
+client. The time a client spends being connected to the server, but not sending
+any messages to it, is also called the **idle time**. One of the reasons for
+this server's behaviour is to save its resources.
+
+Later, when we learn about [Exchanging Messages](./exchanging-messages) with the
+server, we will see how the server counts the **idle time** of a connected
+client from the last message that the client sent to it.
+
+We will also learn a special way of preventing this from happening in
+[Keeping Connection Open](./keeping-connection-open).

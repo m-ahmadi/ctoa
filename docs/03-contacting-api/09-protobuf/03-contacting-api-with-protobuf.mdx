@@ -1,0 +1,213 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Contacting API with Protobuf
+
+## Import Compiled `.proto` Files
+
+In order to import and use the compiled `.proto` files in our code, we need to
+install the corresponding Protobuf library in our programming langauge of
+choice.
+
+<Tabs>
+<TabItem value="JavaScript">
+
+```
+npm i protobufjs
+```
+
+</TabItem>
+
+<TabItem value="Python">
+
+```
+pip install protobuf
+```
+
+</TabItem>
+
+</Tabs>
+
+## Establish Secure Connection
+
+## Encode Decode Messages
+
+## Putting It Altogether
+
+<Tabs>
+<TabItem value="JavaScript">
+
+```js
+var tls = require('tls');
+var pb = require('./pb.compiled.js');
+var creds = require('./credentials.json');
+
+var { accountId: ctidTraderAccountId, accessToken } = creds;
+var { log } = console;
+var nameByType = constructConvenientMap();
+
+const host = 'live.ctraderapi.com';
+const socket = tls.connect(
+  {
+    host: host,
+    port: 5035,
+    servername: host,
+  },
+  () => {
+    log(
+      `connection open (${socket.authorized ? 'authorized' : 'unauthorized'})`,
+    );
+  },
+);
+
+socket.on('connect', () => {
+  log('connect');
+  var rdyBuf = constructMsg(pb.ProtoOAApplicationAuthReq, {
+    clientId: creds.clientId,
+    clientSecret: creds.clientSecret,
+  });
+  socket.write(rdyBuf);
+});
+
+socket.on('data', (buf) => {
+  log('data received');
+  var msg = deconstructMsg(buf);
+  log(msg);
+});
+
+socket.on('error', (error) => {
+  log('error:', error.message); // error.code, error.errno,
+});
+
+socket.on('close', (hadError) => log('close', { hadError }));
+
+// async infinite loop
+(async () => {
+  while (true) {
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+})();
+
+function deconstructMsg(buf) {
+  var protoMsg = pb.ProtoMessage.decode(buf);
+  var PayloadMsg = pb[nameByType[protoMsg.payloadType]];
+  protoMsg.payload = PayloadMsg.decode(protoMsg.payload);
+  return protoMsg;
+}
+
+function constructMsg(Msg, payload) {
+  var payloadMsg = Msg.create(payload);
+  var payloadMsgEncoded = Msg.encode(payloadMsg);
+
+  var protoMsg = pb.ProtoMessage.create({
+    payloadType: payloadMsg.payloadType,
+    payload: payloadMsgEncoded.finish(),
+  });
+
+  var protoMsgEncoded = pb.ProtoMessage.encode(protoMsg);
+
+  var dataLen = protoMsgEncoded.len;
+  var data = protoMsgEncoded.finish();
+
+  var lengthBytes = Buffer.alloc(4);
+  lengthBytes.writeUInt32BE(dataLen, 0);
+
+  var totLen = lengthBytes.length + data.length;
+  var rdyBuf = Buffer.concat([lengthBytes, data], totLen);
+
+  return rdyBuf;
+}
+
+function constructConvenientMap() {
+  const chgcase = (s) =>
+    'ProtoOA' +
+    s
+      .split('PROTO_OA_')[1]
+      .split('_')
+      .map((i) => i.toLowerCase())
+      .map((i) => [i[0].toUpperCase(), ...i.slice(1)].join(''))
+      .join('');
+
+  var o = pb.ProtoOAPayloadType;
+  var payloadTypes = Object.keys(o).map((k) => [o[k], chgcase(k)]);
+  var nameByType = Object.fromEntries(payloadTypes);
+
+  return nameByType;
+}
+```
+
+</TabItem>
+
+<TabItem value="Python">
+
+```py
+import socket
+import ssl
+import json
+from timeit import default_timer as timer
+
+import OpenApiMessages_pb2 as OA
+import OpenApiModelMessages_pb2 as OAModel
+import OpenApiCommonMessages_pb2 as OACommon
+import OpenApiCommonModelMessages_pb2 as OAModelCommon
+
+def main():
+  creds = json.load(open('./credentials.json'))
+  msgname_by_payloadtype = construct_convienient_map()
+
+  context = ssl.create_default_context()
+  host, port = 'live.ctraderapi.com', 5035
+
+  with socket.create_connection((host, port)) as sock:
+    with context.wrap_socket(sock, server_hostname=host) as ssock:
+      print(ssock.version())
+
+      msg = OA.ProtoOAApplicationAuthReq()
+      msg.clientId = creds['clientId']
+      msg.clientSecret = creds['clientSecret']
+      rdybuf = construct_Msg(msg)
+
+      err = ssock.sendall(rdybuf)
+      if err:
+        print(err)
+        exit()
+      data = ssock.recv(4096)
+      protoMsg = deconstruct_Msg(data, msgname_by_payloadtype)
+      print(protoMsg)
+
+
+def construct_convienient_map():
+  m = {}
+  d = OAModel.ProtoOAPayloadType
+  for key in d.keys():
+    payloadType = getattr(d, key)
+    chgkey = 'ProtoOA' + ''.join(key.split('PROTO_OA_')[1].title().split('_'))
+    m[payloadType] = chgkey
+  return m
+
+def construct_Msg(payload_msg):
+  msg = OACommon.ProtoMessage()
+  msg.payload = payload_msg.SerializeToString()
+  msg.payloadType = payload_msg.payloadType
+
+  msgbuf = msg.SerializeToString()
+  lengthbytes = (len(msgbuf)).to_bytes(4, byteorder='big')
+  rdybuf = lengthbytes + msgbuf
+
+  return rdybuf
+
+def deconstruct_Msg(buf, msgname_by_payloadtype):
+  lengthbytes = buf[:4]
+  msgbuf = buf[4:]
+  protoMsg = OACommon.ProtoMessage.FromString(msgbuf)
+  Message = getattr(OA, msgname_by_payloadtype[protoMsg.payloadType])
+  if protoMsg.payload:
+    protoMsg.payload = Message.FromString(protoMsg.payload)
+  return protoMsg
+
+main()
+```
+
+</TabItem>
+
+</Tabs>

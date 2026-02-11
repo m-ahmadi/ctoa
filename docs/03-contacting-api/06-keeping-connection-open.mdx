@@ -1,0 +1,211 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Keeping Connection Open
+
+As [mentioned earlier](./establishing-connection), connection does not stay open
+forever, and in order to keep it open, we have to do some extra work.
+
+Let's use an [infinite loop](../programming-concepts#infinite-loop) and check
+programm state at 5 seconds intervals.
+
+<Tabs>
+<TabItem value="JavaScript">
+
+```js
+const ws = new WebSocket('wss://live.ctraderapi.com:5036');
+
+// util functions
+const { log } = console;
+const sleep = (secs) => new Promise((r) => setTimeout(r, secs * 1000));
+const round = (n, dp) => +n.toFixed(dp);
+const fmt = (n) => round(n / 1000, 1);
+
+const CHECK_INTERVAL_SECS = 5;
+let timeWhenOpened = 0;
+
+ws.onopen = function () {
+  timeWhenOpened = Date.now();
+  log('connected to server');
+};
+
+ws.onclose = function () {
+  log('connection closed');
+};
+
+(async () => {
+  while (true) {
+    await sleep(0);
+    if (ws.readyState !== WebSocket.OPEN) continue;
+
+    const timeBeenOpen = Date.now() - timeWhenOpened;
+    log('connection is been open for', fmt(timeBeenOpen), 'seconds');
+
+    await sleep(CHECK_INTERVAL_SECS);
+  }
+})();
+```
+
+</TabItem>
+
+<TabItem value="Python">
+
+```py
+import asyncio as aio
+import websockets
+from websockets.asyncio.client import connect
+from timeit import default_timer as timer
+
+CHECK_INTERVAL_SECS = 5
+time_when_opened = 0
+
+async def main():
+
+  async with connect('wss://live.ctraderapi.com:5036') as ws:
+    print('connected to server')
+    time_when_opened = timer()
+
+    while True:
+      await aio.sleep(0)
+
+      if ws.state != websockets.State.OPEN:
+        print('connection closed')
+        break
+
+      time_been_open = round(timer() - time_when_opened, 1)
+      print('connection is been open for', time_been_open, 'seconds')
+
+      await aio.sleep(CHECK_INTERVAL_SECS)
+
+aio.run(main())
+```
+
+</TabItem>
+</Tabs>
+
+Results from running the code:
+
+```
+connected to server
+connection is been open for 0 seconds
+connection is been open for 5 seconds
+connection is been open for 10.1 seconds
+connection is been open for 15.1 seconds
+connection is been open for 20.1 seconds
+connection is been open for 25.1 seconds
+connection closed
+```
+
+As we learned
+[here](./establishing-connection#why-connection-closes-automatically) , the
+connection gets closed by the server after being idle for about 30 seconds.
+
+Now that we have the ability to detect how long our connection has been open, we
+can prevent the connection from being closed by repeatedly sending a special
+message to the server at intervals that are under 30 seconds. Let's add below
+parts to our previous code and run it again:
+
+```js
+let timeOfLastAction = 0;
+
+ws.onopen = function () {
+  timeOfLastAction = Date.now();
+  // ...
+};
+
+(async () => {
+  while (true) {
+    // ...
+    const idleTime = fmt(Date.now() - timeOfLastAction);
+    if (idleTime >= 25) {
+      ws.send(JSON.stringify({ payloadType: 51 }));
+      timeOfLastAction = Date.now();
+      log('we just sent heartbeat');
+    }
+    // ...
+  }
+})();
+```
+
+Results from running the code:
+
+```
+connected to server
+connection is been open for 0 seconds
+connection is been open for 5 seconds
+connection is been open for 10.1 seconds
+connection is been open for 15.1 seconds
+connection is been open for 20.1 seconds
+just sent heartbeat
+connection is been open for 25.1 seconds
+connection closed: { code: 1000, reason: 'Bye', wasClean: true }
+```
+
+As you see from the results, connection did not stay open and it got closed by
+server again after idle time reached around 30 seconds. So why our heartbeat
+sending didn't have any effects? It's because we did not authenticate first. You
+can think about it this way, imagine you're the server, and every one that
+connects to you consumes a little bit of your resources, so you let anyone
+connect for 30 seconds and you don't say anything because you're a nice server,
+but if clients want to stay for longer than 30 seconds, they have to show some
+ID, so at least server knows it's not wasting its resources on a stranger.
+
+So let's add the showing our ID part to our previous code and run it again:
+
+```js
+const { clientId, clientSecret } = require('./credentials.json');
+
+ws.onopen = function () {
+  // ...
+  ws.send(
+    JSON.stringify({ payloadType: 2100, payload: { clientId, clientSecret } }),
+  );
+};
+```
+
+Results from running the code:
+
+```
+connected to server
+connection is been open for 0 seconds
+server sent: {"payloadType":2101}
+connection is been open for 5 seconds
+connection is been open for 10.1 seconds
+connection is been open for 15.1 seconds
+connection is been open for 20.1 seconds
+we just sent heartbeat
+connection is been open for 25.1 seconds
+server sent: {"payloadType":51}
+connection is been open for 30.2 seconds
+connection is been open for 35.2 seconds
+connection is been open for 40.2 seconds
+we just sent heartbeat
+connection is been open for 45.3 seconds
+connection is been open for 50.3 seconds
+connection is been open for 55.3 seconds
+server sent: {"payloadType":51}
+connection is been open for 60.4 seconds
+we just sent heartbeat
+connection is been open for 65.4 seconds
+connection is been open for 70.4 seconds
+```
+
+As you see from the results, we succeeded in keeping the connection open for
+longer than 30 seconds. You might have also noticed that not only we're sending
+the heartbeat, but the server is also sending us a heartbeat.
+
+## Note About Python and the `websockets` Package
+
+:::note
+
+In Python, the `websockets` package automatically keeps connection open by
+sending "WebSocket control frames" specifically, "Ping/Pong frames" which are
+part of the WebSocket protocol itself
+[RFC 6455](https://datatracker.ietf.org/doc/html/rfc6455).
+
+This shows that the server only checks for network liveness (i.e., "is the TCP
+connection still responsive?"), therefore the automatic underlaying Ping/Pong
+frames are enough to keep the connection open without sending application level
+heartbeats.
+
+:::

@@ -1,0 +1,15 @@
+# What happened to the order you just sent
+
+if you want to check what happened to the order you must send
+`ProtoOAOrderListReq`, then server sends back a list of orders, now in that list
+you can find your order
+
+you might ask well how can I find my order, well, there are two ways, one way is
+that you can find it based on time of the order, which you can use the
+`utcLastUpdateTimestamp` field of an order in the list of orders returned by
+server
+
+anoter way is to find it using a user-provided orderId, here you must provide a
+`clientOrderId` field when you are sending the `ProtoOANewOrderReq` message,
+this way you already know the id of the order that you want to find (in the list
+of orders returned by the server)

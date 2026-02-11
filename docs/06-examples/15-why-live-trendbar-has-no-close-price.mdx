@@ -1,0 +1,24 @@
+# Why live trendbar has no close price
+
+A live trendbar doesn't have `deltaClose`  
+the close in this case is the current `bid` and `ask`
+
+You can think about it like this:
+
+Because it's a live candle, the `close` keeps changing
+
+Once you subscribe to `SpotEvent` (which you obviously did cuz server throws
+error if you didnt) you get current bid ask values, use those as close
+
+in the picture, each row is a server message, so the red box is your `close`
+price
+
+---
+
+trendbar field is 1M candle of last minute without close (only has
+open,high,low)
+
+bid/ask fields are the last known price and they are the hypothetical/perpetual
+close for the trendbar candle
+
+a somewhat👇 similar (but not identical) conversation

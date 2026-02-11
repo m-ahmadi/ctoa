@@ -1,0 +1,60 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Programming Concepts
+
+Here we will cover programming concepts that are not specifically related to the
+cTrader OpenAPI, but are useful in our intercation with it (or any other similar
+server). For example, concepts like infinite loop, timing, error handling, async
+vs sync, throttling, tracking, state management, and etc.
+
+## Infinite Loop
+
+In this way, the program runs
+[endlessly](https://en.wikipedia.org/wiki/Infinite_loop) giving us the
+opportunity to check program state at specific intervals (e.g. every 2 seconds).
+
+<Tabs>
+<TabItem value="JavaScript - Node.js" label="JavaScript - Node.js">
+
+```js
+const CHECK_INTERVAL_SECS = 2;
+(async () => {
+  while (true) {
+    await sleep(0); // neccessary in "async infinite loops"
+    console.log('checking things...');
+    await sleep(CHECK_INTERVAL_SECS);
+  }
+})();
+```
+
+</TabItem>
+
+<TabItem value="Python" label="Python">
+
+```py
+import asyncio as aio
+CHECK_INTERVAL_SECS = 2
+async def main():
+  while True:
+    await aio.sleep(0) # neccessary in "async infinite loops"
+    print('checking things...')
+    await aio.sleep(CHECK_INTERVAL_SECS)
+
+aio.run(main())
+```
+
+</TabItem>
+</Tabs>
+
+## Timing Things
+
+## Error Handling
+
+## Async vs. Sync
+
+## Throttling
+
+## Tracking
+
+## State Management

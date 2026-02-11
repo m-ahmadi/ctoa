@@ -1,0 +1,89 @@
+# Download All Symbol Configurations
+
+This script does not use official package with Protobuf communication but rather
+uses JSON communication.
+
+Things to do before running the script:
+
+1. `pip install websockets`
+2. put `credentials.json` right beside the script
+3. put `OAModel.custom.json` and `payloadTypes.custom.json` right beside the
+   script. (check
+   [here](./py-json-connect-getsyms-alt#how-to-get-the-json-definition-files) to
+   see how to create them)
+
+```python
+import json
+import asyncio as aio
+from types import SimpleNamespace
+import sys
+from websockets.asyncio.client import connect # pip install websockets
+
+# utils
+parsejson = lambda s: json.loads(s, object_hook=lambda d: SimpleNamespace(**d))
+def readfile(path):
+  with open(path) as f:
+    return parsejson(f.read())
+def writejson(p, x):
+  with open(p, 'w', encoding='utf-8') as f:
+    json.dump(x, f, ensure_ascii=False, indent=2)
+
+creds = readfile('./credentials.json')
+oa = readfile('./OAModel.custom.json')
+pt = readfile('./payloadTypes.custom.json')
+
+
+# set up a function for constructing client messages
+def mk_msg(payloadType, fields={}):
+  client_msg = {
+    'payloadType': payloadType,
+    'payload': {
+      'ctidTraderAccountId': creds.accountId,
+      'accessToken': creds.accessToken,
+      **fields
+    }
+  }
+  return json.dumps(client_msg)
+
+async def main():
+  async with connect('wss://live.ctraderapi.com:5036') as ws:
+    print('auth app')
+    req = {'payloadType': pt.req.ApplicationAuth, 'payload':
+      {'clientId': creds.clientId,'clientSecret': creds.clientSecret}}
+    await ws.send(json.dumps(req))
+    res = parsejson(await ws.recv())
+    if res.payloadType != pt.res.ApplicationAuth:
+      raise Exception('auth app failed')
+
+    print('auth account')
+    await ws.send(mk_msg(pt.req.AccountAuth))
+    res = parsejson(await ws.recv())
+    if res.payloadType != pt.res.AccountAuth:
+      raise Exception('auth account failed')
+
+    print('SymbolsList')
+    await ws.send(mk_msg(pt.req.SymbolsList))
+    res = parsejson(await ws.recv())
+    if res.payloadType != pt.res.SymbolsList:
+      raise Exception('SymbolsList failed')
+    symbols = [sym.__dict__ for sym in res.payload.symbol]
+
+    print('Getting symbol entities...')
+    symbol_entities = []
+    progress = 0
+    progress_total = len(symbols)
+    for symbol in symbols:
+      id = symbol['symbolId']
+      await ws.send(mk_msg(pt.req.SymbolById, {'symbolId': id}))
+      res = json.loads(await ws.recv())
+      symbol_entity = res['payload']['symbol'][0]
+      symbol_entities.append(symbol_entity)
+      progress += 1
+      sys.stdout.write(f'\r{progress}/{progress_total}')
+
+    writejson('symbols.json', symbols)
+    writejson('symbol_entities.json', symbol_entities)
+
+aio.run(main())
+
+```

@@ -1,0 +1,97 @@
+# How to place order with relative sl,tp
+
+https://t.me/ctrader_open_api_support/7761  
+https://t.me/ctrader_open_api_support/7780
+
+Let's go through 3 examples:
+
+1. One for EURUSD
+2. One for USDJPY
+3. One for XAUUSD
+
+:::note All orders have a volume of 0.01 lot :::
+
+## XAUUSD Example
+
+We want to buy XAUUSD at price of: **`3327.45`**  
+We want to put stoploss at: **`3315.26`**  
+and takeprofit at: **`3344.12`**
+
+```js
+// with normal sl,tp
+symbolId: 41,
+limitPrice: 3327.45,
+stopLoss: 3315.26,
+takeProfit: 3344.12,
+volume: 100,
+
+// with relative sl,tp
+symbolId: 41,
+limitPrice: 3327.45,
+relativeStopLoss: 1_219_000,
+relativeTakeProfit: 1_667_000,
+volume: 100,
+
+// these two orders have exactly
+// the same stoploss and takeprofit
+```
+
+## EURUSD Example
+
+We want to buy EURUSD at price of: **`1.13950`**  
+We want to put stoploss at: **`1.12344`**  
+and takeprofit at: **`1.15214`**
+
+```js
+// with normal sl,tp
+symbolId: 1,
+limitPrice: 1.13950,
+stopLoss: 1.12344,
+takeProfit: 1.15214,
+volume: 100000,
+
+// with relative sl,tp
+symbolId: 1,
+limitPrice: 1.13950,
+relativeStopLoss: 1_606,
+relativeTakeProfit: 1_264,
+volume: 100000,
+
+// these two orders have exactly
+// the same stoploss and takeprofit
+```
+
+## USDJPY Example
+
+We want to buy USDJPY at price of: **`142.239`**  
+We want to put stoploss at: **`141.612`**  
+and takeprofit at: **`143.122`**
+
+```js
+// with normal sl,tp
+symbolId: 4,
+limitPrice: 142.239,
+stopLoss: 141.612,
+takeProfit: 143.122,
+volume: 100000,
+
+// with relative sl,tp
+symbolId: 4,
+limitPrice: 142.239,
+relativeStopLoss: 62_700,
+relativeTakeProfit: 88_300,
+volume: 100000,
+
+// these two orders have exactly
+// the same stoploss and takeprofit
+```
+
+## Formula
+
+```js
+// CORRECT METHOD FOR CALCULATING RELATIVE STOPLOSS AND TAKEPROFIT
+
+relativeStopLoss = (entryPrice - stopLossPrice) * 100_000;
+
+relativeTakeProfit = (takeProfitPrice - entryPrice) * 100_000;
+```

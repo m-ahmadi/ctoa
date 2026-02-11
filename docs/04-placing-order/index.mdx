@@ -1,0 +1,20 @@
+# Placing Orders
+
+Things related to placing orders.
+
+```
+limit & stop orders
+    order.limitPrice
+    order.stopPrice
+    a condition that if met, order executes at market price
+    only a condition and not the price at which order executes
+
+limit buy	if ask <= order.limitPrice: order executes
+limit sell	if bid >= order.limitPrice: order executes
+
+stop  buy	if ask >= order.stopPrice: order executes
+stop  sell	if bid <= order.stopPrice: order executes
+
+stoplimit order
+stoplimit buy	if ask >= order.stopPrice: neworder.limitPrice = order.limitPrice
+```

@@ -1,0 +1,136 @@
+# Basic Python example of how to connect to server (JSON, Alt Naming)
+
+This script does not use official package with Protobuf communication but rather
+uses JSON communication.
+
+Things to do before running the script:
+
+1. `pip install websockets`
+2. put `credentials.json` right beside the script
+3. put `OAModel.custom.json` and `payloadTypes.custom.json` right beside the
+   script. (check [below](#how-to-get-the-json-definition-files) to see how to
+   create them)
+
+```python
+import json
+import asyncio as aio
+from types import SimpleNamespace
+from websockets.asyncio.client import connect # pip install websockets
+
+# utils
+parsejson = lambda s: json.loads(s, object_hook=lambda d: SimpleNamespace(**d))
+def readfile(path):
+  with open(path) as f:
+    return parsejson(f.read())
+
+creds = readfile('./credentials.json')
+oa = readfile('./OAModel.custom.json')
+pt = readfile('./payloadTypes.custom.json')
+
+
+# set up a function for constructing client messages
+def construct_msg(payloadType, fields={}):
+  msg = {
+    'payloadType': payloadType,
+    'payload': {
+      'ctidTraderAccountId': creds.accountId,
+      'accessToken': creds.accessToken,
+      **fields
+    }
+  }
+  return json.dumps(msg)
+
+
+async def main():
+  async with connect('wss://live.ctraderapi.com:5036') as ws:
+    print('Application authentication')
+    # we don't use the `construct_msg()` function for the first message,
+    # because its payload is different from the rest of the messages
+    client_msg = {
+      'payloadType': pt.req.ApplicationAuth,
+      'payload': {
+        'clientId': creds.clientId,
+        'clientSecret': creds.clientSecret
+      }
+    }
+    await ws.send(json.dumps(client_msg))
+    server_msg = parsejson(await ws.recv())
+    if server_msg.payloadType != pt.res.ApplicationAuth:
+      print('Application authentication failed')
+      print(json.dumps(server_msg['payload'], indent=2))
+      exit()
+
+    print('Account authentication')
+    client_msg = construct_msg(pt.req.AccountAuth)
+    await ws.send(client_msg)
+    server_msg = parsejson(await ws.recv())
+    if server_msg.payloadType != pt.res.AccountAuth:
+      print('Account authentication failed')
+      print(json.dumps(server_msg['payload'], indent=2))
+      exit()
+
+    print('Getting symbols list')
+    client_msg = construct_msg(pt.req.SymbolsList)
+    await ws.send(client_msg)
+    server_msg = parsejson(await ws.recv())
+    if server_msg.payloadType != pt.res.SymbolsList:
+      print('Getting symbols failed')
+
+    print('Saving symbol list to file')
+    symbols = [sym.__dict__ for sym in server_msg.payload.symbol]
+    with open('symbols.json', 'w', encoding='utf-8') as f:
+      json.dump(symbols, f, ensure_ascii=False, indent=2)
+
+aio.run(main())
+
+```
+
+## How to get the JSON definition files.
+
+Run below snippet to create the `OAModel.json` file. Before running the snippet
+you need to have cTrader OpenAPI Python package installed:
+`pip install ctrader_open_api`
+
+:::note
+
+When using `JSON` communication, we don't need the `ctrader_open_api` package
+anymore. We're only installing it to extract the neccessary information into the
+`OAModel.json` file and we no longer need it afterwards so we can uninstall it
+with `pip uninstall ctrader_open_api -y` after we ran the snippet.
+
+:::
+
+```python
+import ctrader_open_api.messages.OpenApiModelMessages_pb2 as OAModel
+import json
+
+# get OAModel in custom format
+# we're deleting "PayloadType" since we're getting it separately
+target_keys = filter(lambda i: i.startswith('ProtoOA'), dir(OAModel))
+ones_with_keyval = filter(lambda k: hasattr(getattr(OAModel,k),'keys'), target_keys)
+out = {}
+for key in ones_with_keyval:
+  prop = getattr(OAModel, key)
+  name = key.split('ProtoOA')[1]
+  out[name] = dict(zip(prop.keys(), prop.values()))
+del out['PayloadType']
+with open('OAModel.custom.json', 'w', encoding='utf-8') as f:
+  json.dump(out, f, ensure_ascii=False, indent=2)
+
+
+# get payloadTypes in custom format
+excp = {'SLTP':'SLTP', 'PNL':'PnL'}
+out = {'req': {}, 'res': {}, 'event': {}}
+for key, val in OAModel.ProtoOAPayloadType.items():
+  parts = key.split('PROTO_OA_')[1].split('_')
+  type = parts[-1].lower()
+  name = ''.join([excp[i] if i in excp else i.title() for i in parts[:-1]]) # PascalCase (proper)
+  # name = ''.join(map(str.title, parts[:-1]))  # PascalCase (naive)
+  # name = '_'.join(parts[:-1])                 # UPPER_SNAKE_CASE
+  # name = '_'.join(map(str.lower, parts[:-1])) # snake_case
+  out[type][name] = val
+out['common'] = {'Message': 5, 'ErrorRes': 50, 'HeartbeatEvent': 51}
+with open('payloadTypes.custom.json', 'w', encoding='utf-8') as f:
+  json.dump(out, f, ensure_ascii=False, indent=2)
+
+```

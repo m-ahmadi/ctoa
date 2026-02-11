@@ -1,0 +1,172 @@
+# JavaScript example of how to connect to server and place an order (Alt Naming)
+
+Alternative naming for the contents of the Proto files.
+
+```javascript
+var credentials = require('./credentials.json');
+var oa = require('./OAModel.custom.json');
+var pt = require('./payloadTypes.custom.json');
+var fs = require('fs');
+uid = (
+  (i) => () =>
+    'cm_id_' + i++
+)(1);
+
+// put two frequently needed credentials into variables
+var { accountId: ctidTraderAccountId, accessToken } = credentials;
+
+// initialize websocket
+var ws = new WebSocket('wss://live.ctraderapi.com:5036'); // or 'demo.ctraderapi.com:5036'
+
+// main function which is called after successful authentication
+function main() {
+  console.log('ready to do something');
+
+  // request symbols list
+  var clientMsg = {
+    clientMsgId: uid(),
+    payloadType: pt.req.SymbolsList,
+    payload: {
+      ctidTraderAccountId,
+      accessToken,
+      includeArchivedSymbols: false,
+    },
+  };
+  ws.send(JSON.stringify(clientMsg));
+
+  // place order
+  var clientMsg = {
+    clientMsgId: uid(),
+    payloadType: pt.req.NewOrder,
+    payload: {
+      ctidTraderAccountId,
+      accessToken,
+      orderType: oa.OrderType.LIMIT,
+      tradeSide: oa.TradeSide.BUY,
+      symbolId: 41, // XAUUSD
+      limitPrice: 2700.34,
+      volume: 100, // equals 0.01 lot
+      stopLoss: 2600.34,
+      takeProfit: 2750.34,
+    },
+  };
+  ws.send(JSON.stringify(clientMsg));
+}
+
+// main callback
+function onResp(message) {
+  var { payloadType, payload } = message;
+
+  if (payloadType === pt.res.SymbolsList) {
+    var syms = payload.symbol;
+    fs.writeFileSync('syms.json', JSON.stringify(syms, null, 2));
+    console.log('got the symbol list and saved it as syms.json');
+  }
+
+  if (payloadType === pt.event.Execution) {
+    console.log('placed order successfully');
+    console.log('order id:', payload.order.orderId);
+  }
+}
+
+// setting up event listeners for the WebSocket instance
+
+ws.onopen = function (e) {
+  console.log('connected');
+
+  // first thing after connecting is to request for app auth
+  var clientMsg = {
+    clientMsgId: uid(),
+    payloadType: pt.req.ApplicationAuth,
+    payload: {
+      clientId: credentials.clientId,
+      clientSecret: credentials.clientSecret,
+    },
+  };
+  ws.send(JSON.stringify(clientMsg));
+};
+
+ws.onmessage = function (e) {
+  var serverMsg = JSON.parse(e.data);
+  var { payloadType } = serverMsg;
+
+  // apply custom logic on special server messages (i.e. auth results, errors, heartbeat events)
+
+  if (payloadType === pt.res.ApplicationAuth) {
+    console.log('app auth done');
+    // now must request for account auth
+    var clientMsg = {
+      clientMsgId: uid(),
+      payloadType: pt.req.AccountAuth,
+      payload: { ctidTraderAccountId, accessToken },
+    };
+    ws.send(JSON.stringify(clientMsg));
+    return;
+  }
+
+  if (payloadType === pt.res.AccountAuth) {
+    console.log('account auth done');
+    // now everything is ready to do something
+    main();
+    return;
+  }
+
+  if (payloadType === pt.res.Error) {
+    console.log('server sent error message', serverMsg.payload);
+    return;
+  }
+
+  if (payloadType === pt.common.Heartbeat) {
+    console.log('heartbeat event');
+    return;
+  }
+
+  // direct any other server messages to some other function
+  onResp(serverMsg);
+};
+
+ws.onerror = function (e) {
+  console.log('websocket error', e);
+};
+
+ws.onclose = function (e) {
+  console.log('disconnected', e.code, e.reason, e.wasClean);
+};
+```
+
+## How to get the JSON definition file.
+
+```python
+import ctrader_open_api.messages.OpenApiModelMessages_pb2 as OAModel
+import json
+
+# get OAModel in custom format
+# we're deleting "PayloadType" since we're getting it separately
+target_keys = filter(lambda i: i.startswith('ProtoOA'), dir(OAModel))
+ones_with_keyval = filter(lambda k: hasattr(getattr(OAModel,k),'keys'), target_keys)
+out = {}
+for key in ones_with_keyval:
+  prop = getattr(OAModel, key)
+  name = key.split('ProtoOA')[1]
+  out[name] = dict(zip(prop.keys(), prop.values()))
+del out['PayloadType']
+with open('OAModel.custom.json', 'w', encoding='utf-8') as f:
+  json.dump(out, f, ensure_ascii=False, indent=2)
+
+
+# get payloadTypes in custom format
+excp = {'SLTP':'SLTP', 'PNL':'PnL'}
+out = {'req': {}, 'res': {}, 'event': {}}
+for key, val in OAModel.ProtoOAPayloadType.items():
+  parts = key.split('PROTO_OA_')[1].split('_')
+  type = parts[-1].lower()
+  name = ''.join([excp[i] if i in excp else i.title() for i in parts[:-1]]) # PascalCase (proper)
+  # name = ''.join(map(str.title, parts[:-1]))  # PascalCase (naive)
+  # name = '_'.join(parts[:-1])                 # UPPER_SNAKE_CASE
+  # name = '_'.join(map(str.lower, parts[:-1])) # snake_case
+  out[type][name] = val
+out['common'] = {'Message': 5, 'ErrorRes': 50, 'HeartbeatEvent': 51}
+with open('payloadTypes.custom.json', 'w', encoding='utf-8') as f:
+  json.dump(out, f, ensure_ascii=False, indent=2)
+
+```

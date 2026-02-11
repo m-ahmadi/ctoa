@@ -1,0 +1,40 @@
+# Basic WebSocket example in JavaScript
+
+https://t.me/ctrader_open_api_support/8186
+
+Here's a little snippet to play with
+[WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket).  
+It's called an echo server, meaning, whatever you send to it  
+it will send that exact thing back to you.
+
+If you run below snippet (or paste it in the console of your browser),  
+you will see a log like:  
+`server sent you a message: hello`
+
+```js
+var ws = new WebSocket('wss://echo.websocket.org');
+
+ws.onopen = function (e) {
+  console.log('connected to server');
+};
+ws.onmessage = function (e) {
+  console.log('server sent you a message:', e.data);
+};
+ws.onerror = function (e) {
+  console.log('connection encountered an error');
+};
+ws.onclose = function (e) {
+  console.log('connection closed', e.code, e.reason, e.wasClean);
+};
+
+ws.send('hello');
+```
+
+Now for example send another thing to server like
+
+```js
+ws.send('hi');
+```
+
+and you will see another log like  
+`server sent you a message: hi`
